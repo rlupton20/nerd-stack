@@ -2,7 +2,7 @@ extern crate libc;
 
 use std::fs::OpenOptions;
 use std::os::unix::io::IntoRawFd;
-use libc::{c_char, c_short, c_int, ioctl, IF_NAMESIZE};
+use libc::{c_char, c_short, ioctl, IF_NAMESIZE};
 
 static IFFTAP : c_short = 2;
 static IFF_NO_PI : c_short = 4096;
@@ -47,14 +47,11 @@ impl IfReq {
 
 
 fn main() {
-    let mut ifreq : IfReq;
-
     let mut ifreq : IfReq = IfReq::from_name("toytap").unwrap();
     ifreq.ifr_flags(IFFTAP | IFF_NO_PI);
 
     match OpenOptions::new().write(true).open("/dev/net/tun") {
         Ok(t) => {
-            println!("OK");
             unsafe {
                 let rc : i32 = ioctl(t.into_raw_fd(), TUNSETIFF, ifreq);
                 println!("{}", rc);
