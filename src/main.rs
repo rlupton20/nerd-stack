@@ -15,7 +15,7 @@ struct IfReq {
 }
 
 impl IfReq {
-    fn ifr_flags(mut self, flags : c_short) {
+    fn ifr_flags(&mut self, flags : c_short) {
         // Zero the flags and copy the two bytes of flags
         self.union = [0; 24];
         self.union[0] = flags as u8;
@@ -49,17 +49,18 @@ impl IfReq {
 fn main() {
     let mut ifreq : IfReq;
 
-    let ifreq : Option<IfReq> = IfReq::from_name("toytap");
+    let mut ifreq : IfReq = IfReq::from_name("toytap").unwrap();
+    ifreq.ifr_flags(IFFTAP | IFF_NO_PI);
 
     match OpenOptions::new().write(true).open("/dev/net/tun") {
         Ok(t) => {
             println!("OK");
             unsafe {
-                ioctl(t.into_raw_fd(), TUNSETIFF, ifreq);
+                let rc : i32 = ioctl(t.into_raw_fd(), TUNSETIFF, ifreq);
+                println!("{}", rc);
             }
         }
         Err(e) => println!("Failed to open tun device: {}", e)
     }
-
 
 }
