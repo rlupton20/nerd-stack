@@ -3,5 +3,8 @@ name = "nerd-stack"
 version = "0.1.0"
 authors = ["Richard Lupton <richard.lupton@gmail.com>"]
 
+[lib]
+name = "nerd_stack"
+
 [dependencies]
 libc = "0.2"
