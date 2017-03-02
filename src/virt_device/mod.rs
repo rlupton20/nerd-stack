@@ -70,7 +70,7 @@ impl VirtType {
 
     unsafe fn perform_ioctl(&self, fd : c_int, ifreq : IfReq)
                        -> Result<Virt, &'static str> {
-        let rc : i32 = ioctl(fd, TUNSETIFF, ifreq);
+        let rc : i32 = ioctl(fd, TUNSETIFF, &ifreq);
         if rc < 0 {
             Err("Failed on ioctl")
         }
