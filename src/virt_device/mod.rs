@@ -3,6 +3,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::os::unix::io::{IntoRawFd, FromRawFd};
+use std::io::Read;
 use libc::{c_int, c_char, c_short, ioctl, IF_NAMESIZE};
 
 static IFFTUN : c_short = 1;
@@ -56,8 +57,8 @@ type FileDescriptor = c_int;
 pub struct Virt(VirtDevice);
 
 enum VirtDevice {
-    TUN { fd : FileDescriptor },
-    TAP { fd : FileDescriptor }
+    TUN { f : File },
+    TAP { f : File }
 }
 
 impl VirtType {
@@ -68,17 +69,29 @@ impl VirtType {
         }
     }
 
-    unsafe fn perform_ioctl(&self, fd : c_int, ifreq : IfReq)
-                       -> Result<Virt, &'static str> {
-        let rc : i32 = ioctl(fd, TUNSETIFF, &ifreq);
-        if rc < 0 {
-            Err("Failed on ioctl")
-        }
-        else {
-            match *self {
-                VirtType::TUN => Ok(Virt(VirtDevice::TUN { fd : fd, })),
-                VirtType::TAP => Ok(Virt(VirtDevice::TAP { fd : fd, }))
+    fn perform_ioctl(fd : c_int, ifreq : IfReq)
+                       -> Result<c_int, &'static str> {
+        unsafe {
+            let rc : i32 = ioctl(fd, TUNSETIFF, &ifreq);
+            if rc < 0 {
+                Err("Failed on ioctl")
             }
+            else {
+                Ok(fd)
+            }
+        }
+    }
+
+    fn wrap(&self, f : File) -> Virt {
+        match *self {
+            VirtType::TUN => Virt(VirtDevice::TUN { f : f }),
+            VirtType::TAP => Virt(VirtDevice::TAP { f : f })
+        }
+    }
+
+    fn lift(fd : c_int) -> File {
+        unsafe {
+            File::from_raw_fd(fd)
         }
     }
         
@@ -92,9 +105,11 @@ impl VirtType {
 
                 match OpenOptions::new().write(true).open("/dev/net/tun") {
 
-                    Ok(f) => unsafe {
+                    Ok(f) => {
                         let fd : c_int = f.into_raw_fd();
-                        self.perform_ioctl(fd, ifreq)
+                        VirtType::perform_ioctl(fd, ifreq)
+                            .map(VirtType::lift)
+                            .map(| f : File | self.wrap(f))
                     },
 
                     Err(e) => {
@@ -105,6 +120,7 @@ impl VirtType {
             })
     }
 }
+
 
 #[test]
 fn test_virt_type_flags() {
