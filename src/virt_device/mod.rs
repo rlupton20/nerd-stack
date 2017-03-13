@@ -3,7 +3,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::os::unix::io::{IntoRawFd, FromRawFd};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::io;
 use libc::{c_int, c_char, c_short, ioctl, IF_NAMESIZE};
 
@@ -71,6 +71,25 @@ impl Read for Virt {
         }
     }
 }
+
+impl Write for Virt {
+    fn write(&mut self, buf : &[u8]) -> io::Result<usize> {
+        let Virt(ref mut device) = *self;
+        match *device {
+            VirtDevice::TUN{ ref mut f } => f.write(buf),
+            VirtDevice::TAP{ ref mut f } => f.write(buf)
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let Virt(ref mut device) = *self;
+        match *device {
+            VirtDevice::TUN{ ref mut f } => f.flush(),
+            VirtDevice::TAP{ ref mut f } => f.flush()
+        }
+    }
+}
+
 
 impl VirtType {
     fn flags(&self) -> c_short {
