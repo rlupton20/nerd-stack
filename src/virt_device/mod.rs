@@ -4,6 +4,7 @@
 use std::fs::{File, OpenOptions};
 use std::os::unix::io::{IntoRawFd, FromRawFd};
 use std::io::Read;
+use std::io;
 use libc::{c_int, c_char, c_short, ioctl, IF_NAMESIZE};
 
 static IFFTUN : c_short = 1;
@@ -61,6 +62,16 @@ enum VirtDevice {
     TAP { f : File }
 }
 
+impl Read for Virt {
+    fn read(&mut self, buf : &mut [u8]) -> io::Result<usize> {
+        let Virt(ref mut device) = *self;
+        match *device {
+            VirtDevice::TUN{ ref mut f } => f.read(buf),
+            VirtDevice::TAP{ ref mut f } => f.read(buf)
+        }
+    }
+}
+
 impl VirtType {
     fn flags(&self) -> c_short {
         match *self {
@@ -103,7 +114,10 @@ impl VirtType {
             .and_then(| mut ifreq : IfReq | {
                 ifreq.set_ifr_flags(flags);
 
-                match OpenOptions::new().write(true).open("/dev/net/tun") {
+                match OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open("/dev/net/tun") {
 
                     Ok(f) => {
                         let fd : c_int = f.into_raw_fd();
