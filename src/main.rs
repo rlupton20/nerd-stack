@@ -4,6 +4,7 @@ use nerd_stack::virt_device::VirtType;
 use std::io::{Read, Write};
 
 
+#[derive(Debug)]
 struct Ethr<A> {
     dmac : [u8 ; 6],
     smac : [u8 ; 6],
@@ -45,10 +46,10 @@ impl<A : NetworkPacket> NetworkPacket for Ethr<A> {
         let mut bs : Vec<u8> = Vec::with_capacity(1500);
         bs.extend_from_slice(&self.dmac);
         bs.extend_from_slice(&self.smac);
-        bs.append(&mut self.payload.encode());
         // Currently big endian only - add dependent typing
         bs.push(self.ethertype as u8);
         bs.push((self.ethertype >> 8) as u8);
+        bs.append(&mut self.payload.encode());
         bs
     }
 
@@ -92,4 +93,13 @@ fn main() {
         }
         Err(e) => println!("Failed to open device: {}", e)
     }
+}
+
+
+#[test]
+fn decode_encode_ether() {
+    let test : Vec<u8> = vec![1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8];
+    let decoded : Ethr<Vec<u8>> = Ethr::decode(test).unwrap();
+    let reencoded : Vec<u8> = decoded.encode();
+    assert!(reencoded == vec![1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8]);
 }
