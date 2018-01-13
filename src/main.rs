@@ -3,79 +3,76 @@ extern crate nerd_stack;
 use nerd_stack::virt_device::VirtType;
 use std::io::{Read, Write};
 
+#[derive(Debug)]
+#[repr(C, packed)]
+struct ether_hdr {
+    dmac: [u8; 6],
+    smac: [u8; 6],
+    ethertype: [u8; 2],
+}
 
 #[derive(Debug)]
-struct Ethr<A> {
-    dmac : [u8 ; 6],
-    smac : [u8 ; 6],
-    ethertype : u16,
-    payload : A
+struct Ethernet<'a> {
+    hdr: &'a ether_hdr,
+    contents: *const u8,
 }
 
-trait NetworkPacket : Sized {
-    fn new() -> Self;
-    fn encode(self) -> Vec<u8>;
-    fn decode( bs : Vec<u8> ) -> Result<Self, &'static str>;
+enum L3PacketType {
+    ARP,
+    Unknown,
 }
 
-impl NetworkPacket for Vec<u8> {
-    fn new() -> Self {
-        Vec::with_capacity(1500)
+impl<'a> Ethernet<'a> {
+    fn ethertype(&self) -> u16 {
+        self.hdr.ethertype[1] as u16 | (self.hdr.ethertype[0] as u16) << 8
     }
-
-    fn encode(self) -> Vec<u8> {
-        self
+    fn payload_type(&self) -> L3PacketType {
+        match self.ethertype() {
+            0x0806 => L3PacketType::ARP,
+            _ => L3PacketType::Unknown,
+        }
     }
-
-    fn decode( mut bs : Vec<u8> ) -> Result<Self, &'static str> {
-        Ok(bs)
+    fn source_mac(&self) -> String {
+        format!(
+            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
+            self.hdr.smac[0],
+            self.hdr.smac[1],
+            self.hdr.smac[2],
+            self.hdr.smac[3],
+            self.hdr.smac[4],
+            self.hdr.smac[5]
+        )
+    }
+    fn dest_mac(&self) -> String {
+        format!(
+            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
+            self.hdr.dmac[0],
+            self.hdr.dmac[1],
+            self.hdr.dmac[2],
+            self.hdr.dmac[3],
+            self.hdr.dmac[4],
+            self.hdr.dmac[5]
+        )
     }
 }
 
-impl<A : NetworkPacket> NetworkPacket for Ethr<A> {
-    fn new() -> Self {
-        Ethr {
-            dmac : [0 ; 6],
-            smac : [0 ; 6],
-            ethertype : 0,
-            payload : A::new()
+fn dispatch(pkt: Ethernet, nbytes: usize) -> () {
+    match pkt.payload_type() {
+        L3PacketType::ARP => {
+            println!(
+                "--> ARP :: {} bytes :: src {} dest {}",
+                nbytes,
+                pkt.source_mac(),
+                pkt.dest_mac()
+            );
         }
-    }
-
-    fn encode(self) -> Vec<u8> {
-        let mut bs : Vec<u8> = Vec::with_capacity(1500);
-        bs.extend_from_slice(&self.dmac);
-        bs.extend_from_slice(&self.smac);
-        // Currently big endian only - add dependent typing
-        bs.push(self.ethertype as u8);
-        bs.push((self.ethertype >> 8) as u8);
-        bs.append(&mut self.payload.encode());
-        bs
-    }
-
-    fn decode( mut bs : Vec<u8> ) -> Result<Self, &'static str> {
-        let mut pkt : Ethr<A> = Self::new();
-        if let Some(dmac) = bs.get(0..6) {
-            for (i,v) in dmac.iter().enumerate() {
-                pkt.dmac[i] = *v;
-            }
-        }
-        if let Some(smac) = bs.get(6..12) {
-            for (i,v) in smac.iter().enumerate() {
-                pkt.smac[i] = *v;
-            }
-        }
-        else {
-            return Err("Bad packet");
-        }
-
-        pkt.ethertype = (bs[12] as u16) | (bs[13] as u16) << 8;
-        match A::decode(bs.split_off(14)) {
-            Ok(p) => {
-                pkt.payload = p;
-                Ok(pkt)
-            }
-            Err(_) => Err("Bad payload")
+        L3PacketType::Unknown => {
+            println!(
+                "--> UNKNOWN :: {} bytes :: src {} dest {}",
+                nbytes,
+                pkt.source_mac(),
+                pkt.dest_mac()
+            );
         }
     }
 }
@@ -84,22 +81,23 @@ fn main() {
     match VirtType::TAP.open("toytap") {
         Ok(mut v) => {
             println!("Device opened");
-            let mut buf = [0 ; 4096];
-            v.write(&mut buf);
-            match v.read(&mut buf) {
-                Ok(n) => println!("Read {} bytes", n),
-                Err(e) => println!("Error: {}", e)
+            loop {
+                let mut buf: [u8; 4096] = [0; 4096];
+                match v.read(&mut buf) {
+                    Ok(n) => {
+                        let buf_ptr: *const u8 = buf.as_ptr();
+                        let ether_hdr_ptr: *const ether_hdr = buf_ptr as *const _;
+                        let ether_hdr_ref: &ether_hdr = unsafe { &*ether_hdr_ptr };
+                        let ether: Ethernet = Ethernet {
+                            hdr: ether_hdr_ref,
+                            contents: buf[14..].as_ptr(),
+                        };
+                        dispatch(ether, n);
+                    }
+                    Err(e) => println!("Error: {}", e),
+                }
             }
         }
-        Err(e) => println!("Failed to open device: {}", e)
+        Err(e) => println!("Failed to open device: {}", e),
     }
-}
-
-
-#[test]
-fn decode_encode_ether() {
-    let test : Vec<u8> = vec![1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8];
-    let decoded : Ethr<Vec<u8>> = Ethr::decode(test).unwrap();
-    let reencoded : Vec<u8> = decoded.encode();
-    assert!(reencoded == vec![1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8]);
 }
