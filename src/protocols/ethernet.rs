@@ -1,8 +1,25 @@
+// ethernet.rs
+// Defines structures and functions for working with ethernet headers
+
+pub type MAC = [u8; 6];
+
+fn mac_to_string(mac: &MAC) -> String {
+    format!(
+        "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
+        mac[0],
+        mac[1],
+        mac[2],
+        mac[3],
+        mac[4],
+        mac[5]
+    )
+}
+
 #[derive(Debug)]
 #[repr(C, packed)]
 struct ether_hdr {
-    dmac: [u8; 6],
-    smac: [u8; 6],
+    dmac: MAC,
+    smac: MAC,
     ethertype: [u8; 2],
 }
 
@@ -18,7 +35,7 @@ pub enum PacketType {
 }
 
 impl<'a> Ethernet<'a> {
-    pub fn from_buffer(buffer: [u8; 4096], nbytes: usize) -> Option<Self> {
+    pub fn from_buffer(buffer: &[u8; 4096], nbytes: usize) -> Option<Self> {
         if nbytes < 14 {
             None
         } else {
@@ -32,35 +49,23 @@ impl<'a> Ethernet<'a> {
             Some(ether)
         }
     }
+
     fn ethertype(&self) -> u16 {
         self.hdr.ethertype[1] as u16 | (self.hdr.ethertype[0] as u16) << 8
     }
+
     pub fn payload_type(&self) -> PacketType {
         match self.ethertype() {
             0x0806 => PacketType::ARP,
             _ => PacketType::Unknown,
         }
     }
+
     pub fn source_mac(&self) -> String {
-        format!(
-            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
-            self.hdr.smac[0],
-            self.hdr.smac[1],
-            self.hdr.smac[2],
-            self.hdr.smac[3],
-            self.hdr.smac[4],
-            self.hdr.smac[5]
-        )
+        mac_to_string(&self.hdr.smac)
     }
+
     pub fn dest_mac(&self) -> String {
-        format!(
-            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
-            self.hdr.dmac[0],
-            self.hdr.dmac[1],
-            self.hdr.dmac[2],
-            self.hdr.dmac[3],
-            self.hdr.dmac[4],
-            self.hdr.dmac[5]
-        )
+        mac_to_string(&self.hdr.dmac)
     }
 }
