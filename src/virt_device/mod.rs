@@ -152,7 +152,7 @@ fn test_virt_type_flags() {
 
 #[test]
 // TODO: This assumes little endianess
-fn test_flag_setting_in_IfReq() {
+fn test_flag_setting_in_ifreq() {
     let mut ifreq: IfReq = IfReq::new();
     ifreq.set_ifr_flags(IFF_TAP | IFF_NO_PI);
     assert!(ifreq.union[1] == (IFF_NO_PI >> 8) as u8);

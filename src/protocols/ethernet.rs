@@ -1,22 +1,10 @@
 // ethernet.rs
 // Defines structures and functions for working with ethernet headers
 
-pub type MAC = [u8; 6];
+use address::{MAC, mac_to_string};
 
-fn mac_to_string(mac: &MAC) -> String {
-    format!(
-        "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
-        mac[0],
-        mac[1],
-        mac[2],
-        mac[3],
-        mac[4],
-        mac[5]
-    )
-}
-
-#[derive(Debug)]
 #[repr(C, packed)]
+#[derive(Debug)]
 struct ether_hdr {
     dmac: MAC,
     smac: MAC,
@@ -26,7 +14,7 @@ struct ether_hdr {
 #[derive(Debug)]
 pub struct Ethernet<'a> {
     hdr: &'a ether_hdr,
-    contents: *const u8,
+    contents: &'a [u8],
 }
 
 pub enum PacketType {
@@ -39,16 +27,16 @@ impl<'a> Ethernet<'a> {
 
     pub const MTU: usize = 1500;
 
-    pub fn from_buffer(buffer: &[u8; Ethernet::MTU], nbytes: usize) -> Option<Self> {
-        if nbytes < Ethernet::HEADER_LENGTH {
+    pub fn from_buffer(buffer: &'a [u8]) -> Option<Self> {
+        if buffer.len() < Ethernet::HEADER_LENGTH {
             None
         } else {
             let buf_ptr: *const u8 = buffer.as_ptr();
             let ether_hdr_ptr: *const ether_hdr = buf_ptr as *const _;
             let ether_hdr_ref: &ether_hdr = unsafe { &*ether_hdr_ptr };
-            let ether: Ethernet = Ethernet {
+            let ether: Ethernet<'a> = Ethernet {
                 hdr: ether_hdr_ref,
-                contents: buffer[14..].as_ptr(),
+                contents: &buffer[14..],
             };
             Some(ether)
         }
@@ -71,5 +59,9 @@ impl<'a> Ethernet<'a> {
 
     pub fn dest_mac(&self) -> String {
         mac_to_string(&self.hdr.dmac)
+    }
+
+    pub fn contents(&self) -> &[u8] {
+        self.contents
     }
 }
