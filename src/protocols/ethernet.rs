@@ -35,8 +35,12 @@ pub enum PacketType {
 }
 
 impl<'a> Ethernet<'a> {
-    pub fn from_buffer(buffer: &[u8; 4096], nbytes: usize) -> Option<Self> {
-        if nbytes < 14 {
+    const HEADER_LENGTH: usize = 14;
+
+    pub const MTU: usize = 1500;
+
+    pub fn from_buffer(buffer: &[u8; Ethernet::MTU], nbytes: usize) -> Option<Self> {
+        if nbytes < Ethernet::HEADER_LENGTH {
             None
         } else {
             let buf_ptr: *const u8 = buffer.as_ptr();

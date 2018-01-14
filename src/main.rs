@@ -6,7 +6,7 @@ use nerd_stack::protocols::ethernet::{Ethernet, PacketType};
 use std::io::Read;
 
 
-fn ethernet_dispatch(buffer: &[u8; 4096], nbytes: usize) -> () {
+fn ethernet_dispatch(buffer: &[u8; Ethernet::MTU], nbytes: usize) -> () {
     match Ethernet::from_buffer(buffer, nbytes) {
         Some(pkt) => {
             match pkt.payload_type() {
@@ -39,7 +39,7 @@ fn main() {
         Ok(mut v) => {
             println!("Device opened");
             loop {
-                let mut buf: [u8; 4096] = [0; 4096];
+                let mut buf: [u8; Ethernet::MTU] = [0; Ethernet::MTU];
                 match v.read(&mut buf) {
                     Ok(n) => {
                         ethernet_dispatch(&buf, n);
