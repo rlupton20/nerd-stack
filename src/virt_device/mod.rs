@@ -50,8 +50,6 @@ pub enum VirtType {
     TAP,
 }
 
-type FileDescriptor = c_int;
-
 pub struct Virt(VirtDevice);
 
 enum VirtDevice {
