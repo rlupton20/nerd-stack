@@ -1,7 +1,6 @@
 use address::{MAC, IPv4, mac_to_string, ipv4_to_string};
 
 #[repr(C, packed)]
-#[derive(Debug)]
 struct arp_hdr {
     hwtype: u16,
     protype: u16,
@@ -66,7 +65,6 @@ impl<'a> ARP<'a> {
 }
 
 #[repr(C, packed)]
-#[derive(Debug)]
 struct arp_ipv4_parts {
     smac: MAC,
     sip: IPv4,
@@ -74,21 +72,21 @@ struct arp_ipv4_parts {
     dip: IPv4,
 }
 
-pub struct ARP_IPv4<'a> {
+pub struct ArpIPv4<'a> {
     parts: &'a arp_ipv4_parts,
 }
 
-impl<'a> ARP_IPv4<'a> {
+impl<'a> ArpIPv4<'a> {
     const LENGTH: usize = 20;
 
     pub fn from_buffer(buffer: &'a [u8]) -> Option<Self> {
-        if buffer.len() < ARP_IPv4::LENGTH {
+        if buffer.len() != ArpIPv4::LENGTH {
             None
         } else {
             let buf_ptr: *const u8 = buffer.as_ptr();
             let arp_ipv4_ptr: *const arp_ipv4_parts = buf_ptr as *const _;
             let arp_ipv4_ref: &arp_ipv4_parts = unsafe { &*arp_ipv4_ptr };
-            let arp_ipv4: ARP_IPv4 = ARP_IPv4 { parts: arp_ipv4_ref };
+            let arp_ipv4: ArpIPv4 = ArpIPv4 { parts: arp_ipv4_ref };
             Some(arp_ipv4)
         }
     }

@@ -2,7 +2,7 @@ extern crate nerd_stack;
 
 use nerd_stack::virt_device::VirtType;
 use nerd_stack::protocols::ethernet::{Ethernet, PacketType};
-use nerd_stack::protocols::arp::{ARP, ARP_IPv4, HWType, ProType};
+use nerd_stack::protocols::arp::{ARP, ArpIPv4, HWType, ProType};
 
 use std::io::Read;
 
@@ -62,7 +62,7 @@ fn arp_handler(buffer: &[u8], hwtype: HWType) -> () {
 
 
 fn arp_ipv4_handler(buffer: &[u8]) -> () {
-    match ARP_IPv4::from_buffer(buffer) {
+    match ArpIPv4::from_buffer(buffer) {
         Some(pkt) => {
             println!(
                 "           Who has {}? Tell {}",
