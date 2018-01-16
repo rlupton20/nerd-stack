@@ -25,6 +25,11 @@ pub enum ProType {
     IPv4,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Opcode {
+    Request,
+}
+
 impl<'a> ARP<'a> {
     const HEADER_LENGTH: usize = 8;
 
@@ -55,6 +60,14 @@ impl<'a> ARP<'a> {
     pub fn protype(&self) -> Option<ProType> {
         match self.header.protype {
             0x0008 => Some(ProType::IPv4),
+            _ => None,
+        }
+    }
+
+    // TODOL Make agnostic to endianess
+    pub fn opcode(&self) -> Option<Opcode> {
+        match self.header.opcode {
+            0x0100 => Some(Opcode::Request),
             _ => None,
         }
     }

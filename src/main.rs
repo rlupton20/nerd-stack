@@ -2,7 +2,7 @@ extern crate nerd_stack;
 
 use nerd_stack::virt_device::VirtType;
 use nerd_stack::protocols::ethernet::{Ethernet, PacketType};
-use nerd_stack::protocols::arp::{ARP, ArpIPv4, HWType, ProType};
+use nerd_stack::protocols::arp::{ARP, ArpIPv4, HWType, ProType, Opcode};
 
 use std::io::Read;
 
@@ -41,14 +41,14 @@ fn ethernet_dispatch(buffer: &[u8]) -> () {
 fn arp_handler(buffer: &[u8], hwtype: HWType) -> () {
     match ARP::from_buffer(buffer) {
         Some(pkt) => {
-            if let Some(hw) = pkt.hwtype() {
+            if let (Some(hw), Some(opcode)) = (pkt.hwtype(), pkt.opcode()) {
                 if hw == hwtype {
                     match pkt.protype() {
-                        Some(ProType::IPv4) => arp_ipv4_handler(pkt.contents()),
+                        Some(ProType::IPv4) => arp_ipv4_handler(pkt.contents(), opcode),
                         _ => println!("Ignoring"),
                     }
                 } else {
-                    println!("Bad ARP packet");
+                    println!("Unhandled ARP packet");
                 }
             } else {
                 println!("Bad ARP packet");
@@ -61,16 +61,16 @@ fn arp_handler(buffer: &[u8], hwtype: HWType) -> () {
 }
 
 
-fn arp_ipv4_handler(buffer: &[u8]) -> () {
-    match ArpIPv4::from_buffer(buffer) {
-        Some(pkt) => {
+fn arp_ipv4_handler(buffer: &[u8], opcode: Opcode) -> () {
+    match (ArpIPv4::from_buffer(buffer), opcode) {
+        (Some(pkt), Opcode::Request) => {
             println!(
                 "           Who has {}? Tell {}",
                 pkt.destination_ip(),
                 pkt.source_ip()
             );
         }
-        None => println!("Bad ARP for IPv4 address"),
+        _ => println!("Ignoring"),
     }
 }
 
