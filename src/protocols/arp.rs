@@ -1,5 +1,7 @@
 use address::{MAC, IPv4, mac_to_string, ipv4_to_string};
 
+use std::slice;
+
 #[repr(C, packed)]
 struct arp_hdr {
     hwtype: u16,
@@ -15,19 +17,29 @@ pub struct ARP<'a> {
 }
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HWType {
     Ethernet,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ProType {
     IPv4,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Opcode {
     Request,
+    Reply,
+}
+
+impl Opcode {
+    fn encode(&self) -> u16 {
+        match self {
+            Request => 0x0100,
+            Reply => 0x0200,
+        }
+    }
 }
 
 impl<'a> ARP<'a> {
@@ -104,19 +116,19 @@ impl<'a> ArpIPv4<'a> {
         }
     }
 
-    pub fn source_mac(&self) -> String {
-        mac_to_string(&self.parts.smac)
+    pub fn source_mac(&self) -> &MAC {
+        &self.parts.smac
     }
 
-    pub fn destination_mac(&self) -> String {
-        mac_to_string(&self.parts.dmac)
+    pub fn destination_mac(&self) -> &MAC {
+        &self.parts.dmac
     }
 
-    pub fn source_ip(&self) -> String {
-        ipv4_to_string(&self.parts.sip)
+    pub fn source_ip(&self) -> &IPv4 {
+        &self.parts.sip
     }
 
-    pub fn destination_ip(&self) -> String {
-        ipv4_to_string(&self.parts.dip)
+    pub fn destination_ip(&self) -> &IPv4 {
+        &self.parts.dip
     }
 }
