@@ -23,7 +23,7 @@ pub enum PacketType {
 }
 
 impl<'a> Ethernet<'a> {
-    const HEADER_LENGTH: usize = 14;
+    pub const HEADER_LENGTH: usize = 14;
 
     pub const MTU: usize = 1500;
 

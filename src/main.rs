@@ -8,12 +8,18 @@ use nerd_stack::address::{MAC, IPv4, mac_to_string, ipv4_to_string};
 
 use std::collections::BTreeMap;
 
+use std::convert::AsMut;
+
 use std::io::Read;
 
 type ArpTable = BTreeMap<(ProType, [u8; 4]), MAC>;
 
 
-fn ethernet_dispatch(arp_table: &mut ArpTable, buffer: &[u8]) -> () {
+fn ethernet_dispatch(
+    arp_table: &mut ArpTable,
+    buffer: &[u8],
+    mut obuf: [u8; Ethernet::MTU],
+) -> Option<[u8; Ethernet::MTU]> {
     let nbytes: usize = buffer.len();
     match Ethernet::from_buffer(buffer) {
         Some(pkt) => {
@@ -25,7 +31,13 @@ fn ethernet_dispatch(arp_table: &mut ArpTable, buffer: &[u8]) -> () {
                         pkt.source_mac(),
                         pkt.dest_mac()
                     );
-                    arp_handler(arp_table, pkt.contents(), HWType::Ethernet);
+                    match arp_handler(arp_table, pkt.contents(), HWType::Ethernet) {
+                        Some(res) => {
+                            obuf[Ethernet::HEADER_LENGTH..].clone_from_slice(&res);
+                            None
+                        }
+                        None => None,
+                    }
                 }
                 PacketType::Unknown => {
                     println!(
@@ -34,34 +46,49 @@ fn ethernet_dispatch(arp_table: &mut ArpTable, buffer: &[u8]) -> () {
                         pkt.source_mac(),
                         pkt.dest_mac()
                     );
+                    None
                 }
             }
         }
         None => {
             println!("Ethernet packet malformed :: ignoring");
+            None
         }
     }
 }
 
-fn arp_handler(arp_table: &mut ArpTable, buffer: &[u8], hwtype: HWType) -> () {
+fn arp_handler(
+    arp_table: &mut ArpTable,
+    buffer: &[u8],
+    hwtype: HWType,
+) -> Option<[u8; Ethernet::MTU - Ethernet::HEADER_LENGTH]> {
     match ARP::from_buffer(buffer) {
         Some(pkt) => {
             if let (Some(hw), Some(opcode)) = (pkt.hwtype(), pkt.opcode()) {
                 if hw == hwtype {
                     // TODO: Check hwsize
                     match pkt.protype() {
-                        Some(ProType::IPv4) => arp_ipv4_handler(arp_table, pkt.contents(), opcode),
-                        _ => println!("Ignoring"),
+                        Some(ProType::IPv4) => {
+                            arp_ipv4_handler(arp_table, pkt.contents(), opcode);
+                            Some([1; Ethernet::MTU - Ethernet::HEADER_LENGTH])
+                        }
+                        _ => {
+                            println!("Ignoring");
+                            None
+                        }
                     }
                 } else {
                     println!("Unhandled ARP packet");
+                    None
                 }
             } else {
                 println!("Bad ARP packet");
+                None
             }
         }
         None => {
             println!("Invalid ARP packet");
+            None
         }
     }
 }
@@ -111,11 +138,12 @@ fn main() {
         Ok(mut v) => {
             println!("Device opened");
             loop {
-                let mut buf: [u8; Ethernet::MTU] = [0; Ethernet::MTU];
-                match v.read(&mut buf) {
+                let mut ibuf: [u8; Ethernet::MTU] = [0; Ethernet::MTU];
+                match v.read(&mut ibuf) {
                     Ok(n) => {
-                        let packet: &[u8] = &buf[..n];
-                        ethernet_dispatch(&mut arp_table, packet);
+                        let packet: &[u8] = &ibuf[..n];
+                        let mut obuf: [u8; Ethernet::MTU] = [0; Ethernet::MTU];
+                        ethernet_dispatch(&mut arp_table, packet, obuf);
                     }
                     Err(e) => println!("Error: {}", e),
                 }
